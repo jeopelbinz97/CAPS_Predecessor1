@@ -43,25 +43,24 @@ const QuestionListModal = ({
 
   return (
     <>
-      <div className="font-inter bg-opacity-50 lightbox-bg fixed inset-0 z-56 flex items-center justify-center p-3">
+      <div className="font-inter bg-opacity-50 lightbox-bg fixed inset-0 z-56 flex items-center justify-center">
         <div className="w-full max-w-2xl rounded-md bg-white p-6">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="flex rounded-lg border border-gray-200 p-[2px]">
+              <div className="flex rounded-lg border border-gray-200 p-1">
                 <button
                   onClick={() => setActiveTab("all")}
-                  className={`rounded-md px-5 py-[8px] text-sm transition-colors ${
+                  className={`rounded-md px-3 py-1 text-sm transition-colors ${
                     activeTab === "all"
                       ? "bg-orange-100 text-gray-600"
                       : "text-gray-600 hover:bg-gray-50"
                   }`}
                 >
-                  <span className="sm:hidden">All</span>
-                  <span className="hidden sm:inline">All Questions</span>
+                  All Questions
                 </button>
                 <button
                   onClick={() => setActiveTab("bookmarked")}
-                  className={`rounded-md px-3 text-sm text-nowrap transition-colors ${
+                  className={`rounded-md px-3 py-1 text-sm transition-colors ${
                     activeTab === "bookmarked"
                       ? "bg-orange-100 text-gray-600"
                       : "text-gray-600 hover:bg-gray-50"
@@ -75,15 +74,17 @@ const QuestionListModal = ({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={toggleShowAll}
-                className="flex items-center justify-center gap-2 rounded-full px-3 py-1 text-[14px] text-gray-600"
-              >
-                {showAll ? "Hide All" : "Show All"}
-                <i
-                  className={`bx bx-chevron-down text-[18px] transition-transform duration-200 ${showAll ? "rotate-180" : ""}`}
-                ></i>
-              </button>
+              {activeTab === "all" && (
+                <button
+                  onClick={toggleShowAll}
+                  className="flex items-center justify-center gap-2 rounded-full px-3 py-1 text-[14px] text-gray-600"
+                >
+                  {showAll ? "Hide All" : "Show All"}
+                  <i
+                    className={`bx bx-chevron-down text-[18px] transition-transform duration-200 ${showAll ? "rotate-180" : ""}`}
+                  ></i>
+                </button>
+              )}
               <button
                 onClick={onClose}
                 className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-500 hover:bg-gray-100"
@@ -124,10 +125,7 @@ const QuestionListModal = ({
                           : ""
                       }`}
                     >
-                      <div
-                        className="flex items-center justify-between p-3"
-                        onClick={() => toggleQuestion(question.questionID)}
-                      >
+                      <div className="flex items-center justify-between p-3">
                         <div className="flex items-center gap-3">
                           <span
                             onClick={() => toggleQuestion(question.questionID)}
@@ -135,9 +133,12 @@ const QuestionListModal = ({
                           >
                             Question {originalIndex + 1}
                           </span>
-                          <button className="flex justify-center text-[14px] text-gray-500 hover:text-gray-700">
+                          <button
+                            onClick={() => toggleQuestion(question.questionID)}
+                            className="flex justify-center text-[14px] text-gray-500 hover:text-gray-700"
+                          >
                             <i
-                              className={`bx bx-chevron-down text-2xl transition-transform duration-200 ${
+                              className={`bx bx-chevron-down text-[18px] transition-transform duration-200 ${
                                 expandedQuestions[question.questionID]
                                   ? "rotate-180"
                                   : ""
@@ -153,10 +154,9 @@ const QuestionListModal = ({
                           )}
                           {activeTab === "all" && (
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onToggleBookmark(question.questionID);
-                              }}
+                              onClick={() =>
+                                onToggleBookmark(question.questionID)
+                              }
                               className={`ml-2 flex h-8 w-8 items-center justify-center rounded-full ${
                                 bookmarkedQuestions.includes(
                                   question.questionID,
@@ -181,7 +181,7 @@ const QuestionListModal = ({
                             onClick={() => onQuestionClick(originalIndex)}
                             className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-gray-600 hover:bg-gray-200"
                           >
-                            <i class="bx bx-arrow-right-stroke text-2xl"></i>
+                            <i className="bx bx-right-arrow-alt text-xl"></i>
                           </button>
                         </div>
                       </div>
@@ -189,11 +189,7 @@ const QuestionListModal = ({
                       {expandedQuestions[question.questionID] && (
                         <div className="rounded-b-lg border-t border-gray-100 bg-gray-50 p-4">
                           <p className="mb-3 text-[14px] text-gray-800">
-                            <span
-                              dangerouslySetInnerHTML={{
-                                __html: question.questionText,
-                              }}
-                            />
+                            {question.questionText}
                           </p>
                           {question.questionImage && (
                             <div className="mt-2">

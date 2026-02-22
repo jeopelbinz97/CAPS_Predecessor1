@@ -4,8 +4,6 @@ import collegeLogo from "/src/assets/college-logo.png";
 import { useNavigate } from "react-router-dom";
 import LoadingOverlay from "../components/loadingOverlay";
 import AppVersion from "../components/appVersion";
-import Toast from "../components/Toast";
-import useToast from "../hooks/useToast";
 
 export default function LoginPage() {
   const [idCode, setIdCode] = useState("");
@@ -15,8 +13,26 @@ export default function LoginPage() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const apiUrl = import.meta.env.VITE_API_BASE_URL;
 
-  // Get toast functions from hook
-  const { toast, showToast } = useToast();
+  const [toast, setToast] = useState({
+    message: "",
+    type: "",
+    show: false,
+  });
+
+  useEffect(() => {
+    if (toast.message) {
+      setToast((prev) => ({ ...prev, show: true }));
+
+      const timer = setTimeout(() => {
+        setToast((prev) => ({ ...prev, show: false }));
+        setTimeout(() => {
+          setToast({ message: "", type: "", show: false });
+        }, 500);
+      }, 2500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [toast.message]);
 
   const [isLogIn, setIsLogIn] = useState(false);
 
@@ -26,7 +42,11 @@ export default function LoginPage() {
     setIsLogIn(true);
 
     if (!idCode.trim() || !password.trim()) {
-      showToast("Please enter both ID Code and Password.", "error");
+      setToast({
+        message: "Please enter both ID Code and Password.",
+        type: "error",
+        show: true,
+      });
       setIsLogIn(false);
       return;
     }
@@ -49,24 +69,26 @@ export default function LoginPage() {
       if (!response.ok) {
         if (response.status === 401) {
           // 401 Unauthorized -> wrong userCode or password
-          showToast(data.message || "Incorrect user code or password", "error");
+          setToast({
+            message: "Incorrect user code or password",
+            type: "error",
+            show: true,
+          });
         } else {
           // Other errors
-          showToast(
-            data.message || "Something went wrong. Please try again later.",
-            "error",
-          );
+          setToast({
+            message: "Something went wrong. Please try again later.",
+            type: "error",
+            show: true,
+          });
         }
         return;
       }
 
+      console.log("Login successful!", data);
+
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
-
-      // Redirect to /dashboard/:userId after login
-      navigate(
-        `/dashboard/${data.user.userID || data.user.id || data.user._id}`,
-      );
 
       const roleId = Number(data.user.roleID);
       switch (roleId) {
@@ -80,17 +102,18 @@ export default function LoginPage() {
           navigate("/program-chair-dashboard");
           break;
         case 4:
-          navigate("/dean-dashboard");
-          break;
-        case 5:
-          navigate("/asso-dean-dashboard");
+          navigate("/admin-dashboard");
           break;
         default:
           setError("Invalid user role.");
           break;
       }
     } catch (error) {
-      showToast("Something went wrong. Please try again later.", "error");
+      setToast({
+        message: "Something went wrong. Please try again later.",
+        type: "error",
+        show: true,
+      });
     } finally {
       setIsLogIn(false);
     }
@@ -98,11 +121,10 @@ export default function LoginPage() {
 
   return (
     <>
-      {/* Desktop View */}
       <div className="relative hidden min-h-screen w-full bg-[url('/login-bg.png')] bg-cover bg-center bg-no-repeat lg:block">
         {/* Left Section */}
         <div className="flex min-h-screen flex-row">
-          <div className="mr-18 flex w-full flex-col items-center justify-center p-6 text-white lg:w-1/2">
+          <div className="mr-10 flex w-full flex-col items-center justify-center p-6 text-white lg:w-1/2">
             {/* Logos */}
             <div className="absolute top-3 left-3 flex items-center space-x-2">
               <img src={univLogo} alt="Logo 1" className="size-8" />
@@ -162,8 +184,10 @@ export default function LoginPage() {
                   LOG IN ACCOUNT
                 </h2>
                 <p className="mt-2 justify-center text-center text-sm text-gray-500 lg:mr-15">
-                  <span>Welcome! Please enter your code and password </span>
-                  <span> to access your account.</span>
+                  <span>
+                    Welcome! Please enter your user code and password{" "}
+                  </span>
+                  <span>to access your account.</span>
                 </p>
 
                 <form className="mt-6 w-full max-w-sm">
@@ -182,7 +206,7 @@ export default function LoginPage() {
                         htmlFor="userCode"
                         className="pointer-events-none absolute top-1/2 left-4 z-10 -translate-y-1/2 bg-white px-1 text-base text-gray-500 transition-all duration-200 peer-placeholder-shown:top-1/2 peer-placeholder-shown:mt-1 peer-placeholder-shown:text-base peer-focus:top-2 peer-focus:mt-0 peer-focus:text-xs peer-focus:text-[#FE6902] peer-[&:not(:placeholder-shown)]:top-2 peer-[&:not(:placeholder-shown)]:text-xs"
                       >
-                        Instructor Code/Student ID Number
+                        User Code
                       </label>
                     </div>
                   </div>
@@ -206,12 +230,12 @@ export default function LoginPage() {
                       </label>
                       <button
                         type="button"
-                        className="absolute top-[18px] right-3 text-gray-400 transition-colors hover:text-gray-600"
+                        className="absolute top-[18px] right-3 text-gray-400"
                         onClick={() => setPasswordVisible((v) => !v)}
                         tabIndex={-1}
                       >
                         <i
-                          className={`bx ${passwordVisible ? "bx-eye-alt text-orange-500" : "bx-eye-slash"} text-[25px]`}
+                          className={`bx ${passwordVisible ? "bx-show text-orange-500" : "bx-hide"} text-[25px]`}
                         ></i>
                       </button>
                     </div>
@@ -232,7 +256,7 @@ export default function LoginPage() {
                     >
                       {isLogIn ? (
                         <div className="flex items-center justify-center">
-                          <span className="loader-white"></span>
+                          <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                         </div>
                       ) : (
                         "Log in"
@@ -249,7 +273,7 @@ export default function LoginPage() {
 
                   {/* Register Link */}
                   <p className="mt-4 mb-4 justify-center text-center text-[14px] text-gray-600">
-                    Don't have an account?{" "}
+                    Don’t have an account?{" "}
                     <span
                       onClick={() => navigate("/register")}
                       className="cursor-pointer text-orange-500 hover:underline"
@@ -260,24 +284,18 @@ export default function LoginPage() {
 
                   <span className="mx-2 text-xs text-gray-400">
                     Developed by{" "}
-                    <span
-                      onClick={() => navigate("/team-caps")}
-                      className="cursor-pointer text-orange-500 hover:underline"
-                    >
-                      Team Caps
-                    </span>
+                    <span className="text-orange-500">Team Caps</span>
                   </span>
                 </form>
               </div>
             </div>
           </div>
-          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 transform items-center space-x-2 text-gray-400 lg:left-8">
+          <div className="absolute bottom-3 left-1/2 ml-8 flex -translate-x-1/2 transform items-center space-x-2 text-gray-500 lg:left-8">
             <AppVersion />
           </div>
         </div>
       </div>
 
-      {/* Mobile View */}
       <div className="flex flex-col lg:hidden">
         <div className="flex w-full flex-col items-center justify-center bg-gradient-to-br from-[#101010] to-[#3c3c3c]">
           {/* Purple Gradient Header */}
@@ -348,8 +366,8 @@ export default function LoginPage() {
             LOG IN ACCOUNT
           </h2>
           <p className="mb-5 max-w-80 justify-center text-center text-xs text-gray-500 md:max-w-full lg:mr-15">
-            <span>Welcome! Please enter your code and password </span>
-            <span> to access your account.</span>
+            <span>Welcome! Please enter your user code and password </span>
+            <span>to access your account.</span>
           </p>
           <form
             className="mt-2 flex w-full flex-col gap-4 sm:max-w-md md:max-w-xl"
@@ -369,7 +387,7 @@ export default function LoginPage() {
                   htmlFor="userCode"
                   className="pointer-events-none absolute top-1/2 left-4 z-10 -translate-y-1/2 bg-white px-1 text-base text-gray-500 transition-all duration-200 peer-placeholder-shown:top-1/2 peer-placeholder-shown:mt-1 peer-placeholder-shown:text-base peer-focus:top-2 peer-focus:mt-0 peer-focus:text-xs peer-focus:text-[#FE6902] peer-[&:not(:placeholder-shown)]:top-2 peer-[&:not(:placeholder-shown)]:text-xs"
                 >
-                  Instructor Code/Student ID Number
+                  User Code
                 </label>
               </div>
             </div>
@@ -393,12 +411,12 @@ export default function LoginPage() {
                 </label>
                 <button
                   type="button"
-                  className="absolute top-[21px] right-3 text-gray-400 transition-colors hover:text-gray-600"
+                  className="absolute top-[21px] right-3 text-gray-400"
                   onClick={() => setPasswordVisible((v) => !v)}
                   tabIndex={-1}
                 >
                   <i
-                    className={`bx ${passwordVisible ? "bx-eye-alt text-orange-500" : "bx-eye-slash"} text-[25px]`}
+                    className={`bx ${passwordVisible ? "bx-show text-orange-500" : "bx-hide"} text-[25px]`}
                   ></i>
                 </button>
               </div>
@@ -415,7 +433,7 @@ export default function LoginPage() {
             >
               {isLogIn ? (
                 <div className="flex items-center justify-center">
-                  <span className="loader-white"></span>
+                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                 </div>
               ) : (
                 "LOG IN"
@@ -437,18 +455,38 @@ export default function LoginPage() {
           </div>
 
           <span className="mx-2 text-xs text-gray-400">
-            Developed by{" "}
-            <button
-              onClick={() => navigate("/team-caps")}
-              className="cursor-pointer text-orange-500 hover:underline"
-            >
-              Team Caps
-            </button>
+            Developed by <span className="text-orange-500">Team Caps</span>
           </span>
         </div>
       </div>
 
-      <Toast message={toast.message} type={toast.type} show={toast.show} />
+      {toast.message && (
+        <div
+          className={`fixed top-6 left-1/2 z-56 mx-auto flex max-w-md -translate-x-1/2 transform items-center justify-between rounded border border-l-4 bg-white px-4 py-2 shadow-md transition-opacity duration-1000 ease-in-out ${
+            toast.show ? "opacity-100" : "opacity-0"
+          } ${
+            toast.type === "success" ? "border-green-400" : "border-red-400"
+          }`}
+        >
+          <div className="flex items-center">
+            <i
+              className={`mr-3 text-[24px] ${
+                toast.type === "success"
+                  ? "bx bxs-check-circle text-green-400"
+                  : "bx bxs-error text-red-400"
+              }`}
+            ></i>
+            <div>
+              <p className="font-semibold text-gray-800">
+                {toast.type === "success" ? "Success" : "Error"}
+              </p>
+              <p className="mb-1 text-sm text-nowrap text-gray-600">
+                {toast.message}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

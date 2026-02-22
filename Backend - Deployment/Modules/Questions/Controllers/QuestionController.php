@@ -23,7 +23,7 @@ class QuestionController extends Controller
     // Store a new question into the database
     public function store(Request $request)
     {
-        $this->authorizeRoles([2, 3, 4, 5]);
+        $this->authorizeRoles([2, 3, 4]);
 
         $validated = $request->validate([
             'subjectID' => 'required|exists:subjects,subjectID',
@@ -35,14 +35,6 @@ class QuestionController extends Controller
             'status_id' => 'required|exists:statuses,id',
             'purpose_id' => 'required|exists:purposes,id'
         ]);
-
-        // Restrict exam questions (purpose_id 3) if subject is disabled
-        if ($validated['purpose_id'] == 3) {
-            $subject = Subject::find($validated['subjectID']);
-            if (!$subject || !$subject->is_enabled_for_exam_questions) {
-                return response()->json(['message' => 'Adding exam questions is currently disabled for this subject.'], 403);
-            }
-        }
 
         return DB::transaction(function () use ($validated, $request) {
             $imagePath = $this->handleImageUpload($request, 'image', 'question_images');
@@ -79,14 +71,6 @@ class QuestionController extends Controller
             'status_id' => 'sometimes|required|exists:statuses,id',
             'purpose_id' => 'sometimes|required|exists:purposes,id'
         ]);
-
-        // Restrict editing exam questions (purpose_id 3) if subject is disabled
-        if ($question->purpose_id == 3) {
-            $subject = Subject::find($question->subjectID);
-            if (!$subject || !$subject->is_enabled_for_exam_questions) {
-                return response()->json(['message' => 'Editing exam questions is currently disabled for this subject.'], 403);
-            }
-        }
 
         if (isset($validated['questionText'])) {
             $question->questionText = Crypt::encryptString($validated['questionText']);
@@ -137,16 +121,11 @@ class QuestionController extends Controller
             $question->purpose_id = $validated['purpose_id'];
         }
 
-        // Always set status to pending on update and record who edited it
+        // Always set status to pending on update
         $pendingStatus = Status::where('name', 'pending')->first();
         if ($pendingStatus) {
             $question->status_id = $pendingStatus->id;
         }
-        
-        // Record who last edited the question
-        $question->editedBy = Auth::id();
-        // Clear approvedBy when question is edited since it needs to be re-approved
-        $question->approvedBy = null;
 
         $question->save();
 
@@ -159,80 +138,44 @@ class QuestionController extends Controller
     // List all questions for a subject, remove those without choices
     public function indexQuestions($subjectID)
     {
-        $subject = Subject::findOrFail($subjectID);
+        $subject = Subject::find($subjectID);
+        if (!$subject) {
+            return response()->json(['message' => 'Subject not found.'], 404);
+        }
 
-        // Check if user is Program Chair or Associate Dean
-        $user = Auth::user();
-        $isProgramChair = $user->roleID === 3;
-        $isAssociateDean = $user->roleID === 5;
-
-        // Base query with relationships
-        $query = Question::with([
-                'subject', 
-                'choices', 
-                'user', 
-                'status', 
-                'difficulty', 
-                'coverage', 
-                'purpose',
-                'editor' => function($query) {
-                    $query->select('userID', 'firstName', 'lastName');
-                },
-                'approver' => function($query) {
-                    $query->select('userID', 'firstName', 'lastName');
+        // Delete questions with no choices
+        Question::where('subjectID', $subjectID)
+            ->doesntHave('choices')
+            ->each(function ($q) {
+                if ($q->image) {
+                    Storage::disk('public')->delete($q->image);
                 }
-            ])
+                $q->delete();
+            });
+
+        // Get questions with choices only
+        $questions = Question::with(['subject', 'choices', 'user', 'status', 'difficulty', 'coverage', 'purpose'])
             ->where('subjectID', $subjectID)
-            ->whereHas('choices');
-
-        // Apply program-based filtering for Program Chairs, but also include questions added by the Dean (roleID 4)
-        if ($isProgramChair) {
-            $query->where(function($q) use ($user) {
-                $q->whereHas('user', function($q2) use ($user) {
-                    $q2->where('programID', $user->programID);
-                })
-                ->orWhereHas('user', function($q2) {
-                    $q2->where('roleID', 4); // Dean
-                });
-            });
-        }
-
-        // Apply campus-based filtering for Associate Deans
-        if ($isAssociateDean) {
-            $query->whereHas('user', function($q) use ($user) {
-                $q->where('campusID', $user->campusID);
-            });
-        }
-
-        $questions = $query->orderBy('created_at', 'desc')
             ->get()
-            ->map(fn($q) => $this->formatQuestion($q));
+            ->reject(fn($q) => $q->choices->isEmpty())
+            ->map(fn($q) => $this->formatQuestion($q))
+            ->values();
 
         return response()->json([
             'message' => 'Questions retrieved successfully.',
             'subject' => $subject->subjectName,
-            'total_questions' => $questions->count(),
-            'data' => $questions,
-            'last_updated' => $questions->max('updated_at')
+            'data' => $questions
         ]);
     }
 
     // Delete a specific question
     public function destroy($questionID)
     {
-        $this->authorizeRoles([2, 3, 4, 5]);
+        $this->authorizeRoles([2, 3, 4]);
 
         $question = Question::find($questionID);
         if (!$question) {
             return response()->json(['message' => 'Question not found.'], 404);
-        }
-
-        // Restrict deleting exam questions (purpose_id 3) if subject is disabled
-        if ($question->purpose_id == 3) {
-            $subject = Subject::find($question->subjectID);
-            if (!$subject || !$subject->is_enabled_for_exam_questions) {
-                return response()->json(['message' => 'Deleting exam questions is currently disabled for this subject.'], 403);
-            }
         }
 
         if ($question->image) {
@@ -270,10 +213,10 @@ class QuestionController extends Controller
         ], 200);
     }
 
-    // Approve a question if it's pending and not edited by the current user
+    // Approve a question if it's pending and not owned by the current user
     public function updateStatus($questionID)
     {
-        $this->authorizeRoles([3, 4, 5]);
+        $this->authorizeRoles([3, 4]);
 
         $question = Question::find($questionID);
         if (!$question) {
@@ -288,22 +231,13 @@ class QuestionController extends Controller
             ], 400);
         }
 
-        // Check if the current user is the creator and the question hasn't been edited yet
-        if (Auth::id() === $question->userID && !$question->editedBy) {
+        if (Auth::id() === $question->userID) {
             return response()->json(['message' => 'You cannot approve your own question.'], 403);
-        }
-
-        // Check if the current user is the one who last edited the question
-        if (Auth::id() === $question->editedBy) {
-            return response()->json(['message' => 'You cannot approve a question you last edited.'], 403);
         }
 
         $approvedStatus = Status::where('name', 'approved')->first();
         if ($approvedStatus) {
-            $question->status_id = $approvedStatus->id;
-            // Update the approvedBy field with the current user
-            $question->approvedBy = Auth::id();
-            $question->save();
+            $question->update(['status_id' => $approvedStatus->id]);
         }
 
         return response()->json(['message' => 'Question approved.', 'question' => $this->formatQuestion($question)]);
@@ -353,7 +287,7 @@ class QuestionController extends Controller
      */
     public function duplicate(Request $request, $questionID)
     {
-        $this->authorizeRoles([2, 3, 4, 5]);
+        $this->authorizeRoles([2, 3, 4]);
 
         try {
             // Validate optional modifications
@@ -379,13 +313,8 @@ class QuestionController extends Controller
 
             // Create new question with modifications
             $newQuestion = $originalQuestion->replicate();
-            // Set the current user as the creator of the duplicated question
             $newQuestion->userID = Auth::id();
-            // Set initial status as pending
             $newQuestion->status_id = Status::where('name', 'pending')->first()->id;
-            // Clear editor and approver information for the new question
-            $newQuestion->editedBy = null;
-            $newQuestion->approvedBy = null;
 
             // Apply modifications if provided
             if (isset($validated['questionText'])) {
@@ -548,7 +477,7 @@ class QuestionController extends Controller
                 ->find($newQuestion->questionID);
 
             return response()->json([
-                'message' => 'Question duplicated successfully. You are now set as the creator of this new question.',
+                'message' => 'Question duplicated successfully with modifications.',
                 'data' => $this->formatQuestion($newQuestion)
             ], 201)->header('Content-Type', 'application/json');
 
@@ -563,176 +492,6 @@ class QuestionController extends Controller
         }
     }
 
-    /**
-     * Preview all questions from a student's perspective
-     * This function is accessible to faculty, program chair, and dean
-     * 
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function previewAllQuestions(Request $request)
-    {
-        $this->authorizeRoles([2, 3, 4, 5]); // Only faculty, program chair, and dean
-
-        try {
-            $query = Question::with([
-                'subject',
-                'choices',
-                'status',
-                'difficulty',
-                'coverage',
-                'purpose',
-                'user' => function($query) {
-                    $query->select('userID', 'firstName', 'lastName', 'programID');
-                }
-            ])->whereHas('status', function($query) {
-                $query->where('name', 'approved');
-            });
-
-            // If user is Program Chair, only show questions from their program
-            if (Auth::user()->roleID === 3) {
-                $query->whereHas('user', function($q) {
-                    $q->where('programID', Auth::user()->programID)
-                      ->orWhere('programID', 6); // Include general education questions
-                });
-            }
-
-            // Group questions by subject
-            $questions = $query->get()
-                ->groupBy('subjectID')
-                ->map(function($subjectQuestions) {
-                    $subject = $subjectQuestions->first()->subject;
-                    
-                    // Group questions by coverage (midterm/finals)
-                    $questionsByCoverage = $subjectQuestions->groupBy(function($q) {
-                        return $q->coverage->name;
-                    })->map(function($coverageQuestions) {
-                        // Group by difficulty
-                        return $coverageQuestions->groupBy(function($q) {
-                            return $q->difficulty->name;
-                        })->map(function($questions) {
-                            return $questions->map(function($q) {
-                                return $this->formatQuestionForPreview($q);
-                            });
-                        });
-                    });
-
-                    return [
-                        'subjectName' => $subject->subjectName,
-                        'subjectCode' => $subject->subjectCode,
-                        'questions' => $questionsByCoverage
-                    ];
-                });
-
-            return response()->json([
-                'message' => 'Questions preview retrieved successfully.',
-                'data' => $questions
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Question Preview Error: ' . $e->getMessage());
-            return response()->json([
-                'message' => 'Failed to retrieve questions preview.',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Format question for preview display
-     * Similar to formatQuestion but with additional student-perspective formatting
-     */
-    private function formatQuestionForPreview($question)
-    {
-        try {
-            $questionText = Crypt::decryptString($question->questionText);
-        } catch (\Exception $e) {
-            $questionText = '[Decryption Error]';
-            Log::error("Question decrypt error ID{$question->questionID}: {$e->getMessage()}");
-        }
-
-        // Format choices like they would appear to students
-        $choices = $question->choices->map(function($choice) {
-            try {
-                $text = $choice->choiceText ? Crypt::decryptString($choice->choiceText) : null;
-            } catch (\Exception $e) {
-                $text = null;
-            }
-
-            return [
-                'text' => $text,
-                'image' => $this->generateUrl($choice->image),
-                'position' => $choice->position,
-                'isCorrect' => $choice->isCorrect // Include correct answer for faculty review
-            ];
-        })->sortBy('position')->values();
-
-        return [
-            'questionID' => $question->questionID,
-            'questionText' => $questionText,
-            'questionImage' => $this->generateUrl($question->image),
-            'score' => $question->score,
-            'difficulty' => $question->difficulty->name,
-            'coverage' => $question->coverage->name,
-            'purpose' => $question->purpose->name,
-            'choices' => $choices,
-            'creator' => [
-                'name' => $question->user->firstName . ' ' . $question->user->lastName,
-                'program' => $question->user->programID
-            ]
-        ];
-    }
-
-    // Return all questions without choices
-    public function questionCount()
-    {
-        $questions = Question::with([
-            'subject',
-            'user.program', // eager load user's program
-            'user.role',    // eager load user's role
-            'status',
-            'difficulty',
-            'coverage',
-            'purpose',
-            'editor' => function($query) {
-                $query->select('userID', 'firstName', 'lastName');
-            },
-            'approver' => function($query) {
-                $query->select('userID', 'firstName', 'lastName');
-            }
-        ])->get();
-
-        // Format questions but skip choices
-        $formatted = $questions->map(function($q) {
-            try {
-                $q->questionText = \Crypt::decryptString($q->questionText);
-            } catch (\Exception $e) {
-                $q->questionText = '[Decryption Error]';
-            }
-            $q->image = $this->generateUrl($q->image);
-            $q->creatorName = optional($q->user)->firstName . ' ' . optional($q->user)->lastName;
-            $q->editorName = optional($q->editor)->firstName . ' ' . optional($q->editor)->lastName;
-            $q->approverName = optional($q->approver)->firstName . ' ' . optional($q->approver)->lastName;
-            $q->status_name = optional($q->status)->name;
-            $q->difficulty_name = optional($q->difficulty)->name;
-            $q->coverage_name = optional($q->coverage)->name;
-            $q->purpose_name = optional($q->purpose)->name;
-            // Add program name
-            $q->program = optional(optional($q->user)->program)->programName;
-            // Add role name, but if Instructor, return Faculty
-            $roleName = optional(optional($q->user)->role)->roleName;
-            $q->role = ($roleName === 'Instructor') ? 'Faculty' : $roleName;
-            unset($q->choices); // Remove choices if present
-            return $q;
-        });
-
-        return response()->json([
-            'message' => 'All questions retrieved successfully (no choices).',
-            'total_questions' => $formatted->count(),
-            'data' => $formatted
-        ]);
-    }
-    
     // ============ PRIVATE HELPERS ============
 
     // Ensure only users with certain roles can access specific methods
@@ -773,10 +532,6 @@ class QuestionController extends Controller
 
         $question->image = $this->generateUrl($question->image);
         $question->creatorName = optional($question->user)->firstName . ' ' . optional($question->user)->lastName;
-        
-        // Add editor and approver information
-        $question->editorName = optional($question->editor)->firstName . ' ' . optional($question->editor)->lastName;
-        $question->approverName = optional($question->approver)->firstName . ' ' . optional($question->approver)->lastName;
 
         // Add related model names for easier frontend handling
         $question->status_name = optional($question->status)->name;

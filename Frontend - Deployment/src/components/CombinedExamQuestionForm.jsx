@@ -406,8 +406,7 @@ const CombinedExamQuestionForm = ({ subjectID, onComplete, onCancel }) => {
                             e.target.value,
                           )
                         }
-                        disabled={choice.choiceText === "None of the above"}
-                        className={`w-[80%] rounded-none border-0 border-gray-300 p-2 text-[14px] transition-all duration-100 hover:border-b hover:border-b-gray-500 focus:border-b-2 focus:border-b-orange-500 focus:outline-none ${choice.choiceText === "None of the above" ? "cursor-not-allowed bg-gray-100" : ""}`}
+                        className="w-[80%] rounded-none border-0 border-gray-300 p-2 text-[14px] transition-all duration-100 hover:border-b hover:border-b-gray-500 focus:border-b-2 focus:border-b-orange-500 focus:outline-none"
                         onFocus={() => setFocusedChoice(index)}
                         onBlur={(e) => {
                           if (
@@ -424,31 +423,29 @@ const CombinedExamQuestionForm = ({ subjectID, onComplete, onCancel }) => {
                     )}
 
                     {/* Image Upload Button */}
-                    {!choice.image &&
-                      focusedChoice === index &&
-                      choice.choiceText !== "None of the above" && (
-                        <>
-                          <button
-                            onClick={() =>
-                              document
-                                .getElementById(`fileInput-${index}`)
-                                .click()
-                            }
-                            className="image-upload-btn cursor-pointer rounded-md px-2 py-1 text-[24px] text-[rgb(120,120,120)] hover:text-gray-900"
-                          >
-                            <i className="bx bx-image-alt"></i>
-                          </button>
-                          <input
-                            id={`fileInput-${index}`}
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(event) =>
-                              handleChoiceImageUpload(index, event)
-                            }
-                          />
-                        </>
-                      )}
+                    {!choice.image && focusedChoice === index && (
+                      <>
+                        <button
+                          onClick={() =>
+                            document
+                              .getElementById(`fileInput-${index}`)
+                              .click()
+                          }
+                          className="image-upload-btn cursor-pointer rounded-md px-2 py-1 text-[24px] text-[rgb(120,120,120)] hover:text-gray-900"
+                        >
+                          <i className="bx bx-image-alt"></i>
+                        </button>
+                        <input
+                          id={`fileInput-${index}`}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(event) =>
+                            handleChoiceImageUpload(index, event)
+                          }
+                        />
+                      </>
+                    )}
 
                     {/* Choice Image Preview */}
                     {choice.image && (
@@ -528,6 +525,7 @@ const CombinedExamQuestionForm = ({ subjectID, onComplete, onCancel }) => {
                   <i className="bx bx-help-circle text-[18px]"></i>
                 </button>
 
+                {/* Tooltip */}
                 {showTip && (
                   <div className="absolute bottom-7 left-35 z-10 w-[200px] rounded-md bg-gray-700 p-2 text-[12px] text-white shadow-md">
                     Enter a score between 1 and 100 for this question.
@@ -598,7 +596,7 @@ const CombinedExamQuestionForm = ({ subjectID, onComplete, onCancel }) => {
                   >
                     {isLoading ? (
                       <div className="flex items-center justify-center">
-                        <span className="loader-white"></span>
+                        <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
                       </div>
                     ) : (
                       "Save"

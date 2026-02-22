@@ -24,7 +24,7 @@ class ChoiceController extends Controller
         $user = Auth::user();
 
         // Only Instructor, Program Chair, Dean can add choices
-        if (!in_array($user->roleID, [2, 3, 4, 5])) {
+        if (!in_array($user->roleID, [2, 3, 4])) {
             return response()->json([
                 'message' => 'Unauthorized. You do not have permission to add choices.'
             ], 403);
@@ -32,7 +32,7 @@ class ChoiceController extends Controller
 
         $validated = $request->validate([
             'questionID' => 'required|exists:questions,questionID',
-            'choices' => 'required|array|min:5|max:5',
+            'choices' => 'required|array|min:4|max:4',
             'choices.*.choiceText' => 'nullable|string',
             'choices.*.isCorrect'  => 'required|boolean',
             'choices.*.image'      => 'nullable',
@@ -43,7 +43,7 @@ class ChoiceController extends Controller
             $choices = [];
             $hasCorrectChoice = false;
 
-            // Process all 5 choices
+            // Process the first 4 manual choices
             foreach ($validated['choices'] as $index => $choiceData) {
                 $imagePath = null;
 
@@ -57,7 +57,7 @@ class ChoiceController extends Controller
                     }
                 }
 
-                $encryptedChoiceText = strlen($choiceData['choiceText']) > 0
+                $encryptedChoiceText = $choiceData['choiceText']
                     ? Crypt::encryptString($choiceData['choiceText'])
                     : null;
 
@@ -70,19 +70,22 @@ class ChoiceController extends Controller
                     'choiceText' => $encryptedChoiceText,
                     'isCorrect'  => $choiceData['isCorrect'],
                     'image'      => $imagePath,
-                    'position'   => $index + 1  // Position 1-5 for all choices
+                    'position'   => $index + 1  // Position 1-4 for manual choices
                 ]);
 
                 $choices[] = $choice;
             }
 
-            // Validate that at least one choice is marked as correct
-            if (!$hasCorrectChoice) {
-                DB::rollBack();
-                return response()->json([
-                    'message' => 'At least one choice must be marked as correct.'
-                ], 422);
-            }
+            // Add "None of the above" as the 5th choice
+            $noneOfTheAbove = Choice::create([
+                'questionID' => $validated['questionID'],
+                'choiceText' => Crypt::encryptString('None of the above.'),
+                'isCorrect'  => !$hasCorrectChoice, // It's correct only if no other choice is correct
+                'image'      => null,
+                'position'   => 5  // Always position 5 for "None of the above"
+            ]);
+
+            $choices[] = $noneOfTheAbove;
 
             DB::commit();
 
@@ -114,13 +117,13 @@ class ChoiceController extends Controller
     {
         $user = Auth::user();
 
-        if (!in_array($user->roleID, [2, 3, 4, 5])) {
+        if (!in_array($user->roleID, [2, 3, 4])) {
             return response()->json(['message' => 'Unauthorized.'], 403);
         }
 
         $request->validate([
             'questionID' => 'required|exists:questions,questionID',
-            'choices' => 'required|array|min:5|max:5',
+            'choices' => 'required|array|min:4|max:4',
             'choices.*.choiceID' => 'nullable|exists:choices,choiceID',
             'choices.*.choiceText' => 'nullable|string',
             'choices.*.isCorrect' => 'required|boolean',
@@ -133,6 +136,11 @@ class ChoiceController extends Controller
             $questionID = $request->questionID;
             $hasCorrectChoice = false;
 
+            // First, get the existing "None of the above" choice
+            $noneOfTheAbove = Choice::where('questionID', $questionID)
+                ->where('position', 5)
+                ->first();
+
             foreach ($request->choices as $index => $choiceData) {
                 $choice = isset($choiceData['choiceID'])
                     ? Choice::find($choiceData['choiceID']) ?? new Choice()
@@ -141,7 +149,7 @@ class ChoiceController extends Controller
                 $choice->questionID = $questionID;
 
                 // Encrypt text if present
-                $choice->choiceText = strlen($choiceData['choiceText']) > 0
+                $choice->choiceText = isset($choiceData['choiceText']) && $choiceData['choiceText'] !== null
                     ? Crypt::encryptString($choiceData['choiceText'])
                     : null;
 
@@ -169,17 +177,21 @@ class ChoiceController extends Controller
                     $choice->image = null;
                 }
 
-                $choice->position = $index + 1;  // Position 1-5 for all choices
+                $choice->position = $index + 1;  // Position 1-4 for manual choices
                 $choice->save();
             }
 
-            // Validate that at least one choice is marked as correct
-            if (!$hasCorrectChoice) {
-                DB::rollBack();
-                return response()->json([
-                    'message' => 'At least one choice must be marked as correct.'
-                ], 422);
+            // Update the existing "None of the above" choice or create a new one
+            if (!$noneOfTheAbove) {
+                $noneOfTheAbove = new Choice();
+                $noneOfTheAbove->questionID = $questionID;
             }
+
+            $noneOfTheAbove->choiceText = Crypt::encryptString('None of the above.');
+            $noneOfTheAbove->isCorrect = !$hasCorrectChoice;
+            $noneOfTheAbove->image = null;
+            $noneOfTheAbove->position = 5;  // Always position 5 for "None of the above"
+            $noneOfTheAbove->save();
 
             DB::commit();
 

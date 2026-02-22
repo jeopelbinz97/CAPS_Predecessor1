@@ -81,7 +81,7 @@ class User extends Authenticatable
     // 🔹 Check if the user is a Dean
     public function isDean(): bool
     {
-        return in_array($this->roleID, [4, 5]); // Dean (4) or Associate Dean (5)
+        return $this->roleID === 4;
     }
 
     public function subjects()

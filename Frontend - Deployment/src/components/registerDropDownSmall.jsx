@@ -43,7 +43,7 @@ const RegisterDropDown = ({ name, value, onChange, options, placeholder }) => {
           ref={buttonRef}
           type="button"
           onClick={handleOpenDropdown}
-          className={`relative mb-1 flex w-full cursor-pointer items-center rounded-xl bg-white px-4 py-[7px] text-[14px] transition-all duration-200 ease-in-out outline-none hover:border-gray-500 focus:outline-none ${isOpen ? "border-none ring-1 ring-orange-500 ring-offset-1" : "border border-gray-300"}`}
+          className={`relative mb-2 flex w-full cursor-pointer items-center rounded-xl bg-white px-4 py-2 text-[14px] transition-all duration-200 ease-in-out outline-none hover:border-gray-500 focus:outline-none ${isOpen ? "border-none ring-1 ring-orange-500 ring-offset-1" : "border border-gray-300"}`}
         >
           <span className={`truncate ${!value ? "text-gray-500" : ""}`}>
             {options.find((opt) => opt.value === value)?.label || placeholder}
@@ -56,11 +56,11 @@ const RegisterDropDown = ({ name, value, onChange, options, placeholder }) => {
         {/* Dropdown Options */}
         {isOpen && (
           <ul
-            className={`animate-dropdown animate-fadein absolute left-0 z-10 mx-2 mt-1 w-[calc(100%-16px)] rounded border border-gray-300 bg-white p-1 shadow-lg ${
+            className={`absolute z-50 w-full max-w-full border border-gray-300 bg-white shadow-md sm:min-w-[180px] ${
               dropdownPosition === "bottom"
                 ? "top-full mt-1"
                 : "bottom-full mb-1"
-            } custom-scrollbar max-h-[200px] overflow-y-auto rounded-md`}
+            } max-h-[200px] overflow-y-auto rounded-md`}
           >
             {options.map((option) => (
               <li
@@ -69,7 +69,7 @@ const RegisterDropDown = ({ name, value, onChange, options, placeholder }) => {
                   onChange({ target: { name, value: option.value } });
                   setIsOpen(false);
                 }}
-                className="flex cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-[13px] hover:bg-gray-100"
+                className={`cursor-pointer px-3 py-2 text-start text-[14px] transition hover:bg-[rgb(255,230,214)] ${value === option.value ? "bg-orange-500 text-white hover:bg-orange-500" : ""} first:rounded-t-md last:rounded-b-md`}
               >
                 {option.label}
               </li>

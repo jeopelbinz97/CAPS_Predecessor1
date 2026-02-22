@@ -6,7 +6,7 @@ const LoadingOverlay = ({ show = false }) => {
 
   return (
     <div className="lightbox-bg bg-opacity-50 fixed inset-0 z-56 flex flex-col items-center justify-center">
-      <i className="loader-white"></i>
+      <i className="bx bxs-cog mb-2 animate-spin text-5xl text-white"></i>
     </div>
   );
 };

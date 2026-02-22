@@ -8,27 +8,18 @@ use Modules\Users\Models\User;
 use Modules\PracticeExams\Models\PracticeExamSetting;
 use Modules\Users\Models\Program;
 use Modules\PracticeExams\Models\PracticeExamResult;
-use Modules\Subjects\Models\YearLevel;
+use Modules\YearLevels\Models\YearLevel;
 
-/**
- * Subject Model
- *
- * @property bool $is_enabled_for_exam_questions Indicates if exam questions (purpose_id 3) can be added, edited, or deleted. Controlled by Dean (roleID 4).
- */
 class Subject extends Model
 {
     protected $table = 'subjects';
-    protected $primaryKey = 'subjectID'; 
+    protected $primaryKey = 'subjectID';
+
     protected $fillable = [
         'programID',
         'subjectCode',
-        'subjectName', 
-        'yearLevelID',
-        'is_enabled_for_exam_questions'
-    ];
-
-    protected $casts = [
-        'is_enabled_for_exam_questions' => 'boolean',
+        'subjectName',
+        'yearLevelID'
     ];
 
     public function faculty()
