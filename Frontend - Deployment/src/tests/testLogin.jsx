@@ -4,7 +4,7 @@ import univLogo from "../assets/univLogo.png";
 import collegeLogo from "/src/assets/college-logo.png";
 import LoadingOverlay from "../components/loadingOverlay";
 import RegisterDropDown from "../components/registerDropDown";
-import AppVersion from "../components/appVersion";
+import AppVersion from "../components/AppVersion";
 
 export default function LoginPage() {
   const [userCode, setUserCode] = useState("");
@@ -633,7 +633,7 @@ export default function LoginPage() {
                   >
                     {isRegistering ? (
                       <div className="flex items-center justify-center">
-                        <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                        <span className="loader-white"></span>
                       </div>
                     ) : (
                       "Register"
