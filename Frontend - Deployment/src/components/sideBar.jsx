@@ -5,7 +5,7 @@ import AllSubjectsDropDownProgramChair from "./subjectsProgramChair";
 import AssignedSubjectsDropDown from "./subjectsFaculty";
 import SideBarToolTip from "./sidebarTooltip";
 import PrintExamModal from "./PrintExamModal";
-import AppVersion from "./appVersion";
+import AppVersion from "./AppVersion";
 
 // Displays the main sidebar
 const Sidebar = ({
