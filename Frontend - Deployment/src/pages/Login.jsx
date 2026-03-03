@@ -3,7 +3,7 @@ import univLogo from "../assets/univLogo.png";
 import collegeLogo from "/src/assets/college-logo.png";
 import { useNavigate } from "react-router-dom";
 import LoadingOverlay from "../components/loadingOverlay";
-import AppVersion from "../components/AppVersion";
+import AppVersion from "../components/appVersion";
 import Toast from "../components/Toast";
 import useToast from "../hooks/useToast";
 
@@ -62,6 +62,11 @@ export default function LoginPage() {
 
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
+
+      // Redirect to /dashboard/:userId after login
+      navigate(
+        `/dashboard/${data.user.userID || data.user.id || data.user._id}`,
+      );
 
       const roleId = Number(data.user.roleID);
       switch (roleId) {
@@ -158,7 +163,7 @@ export default function LoginPage() {
                 </h2>
                 <p className="mt-2 justify-center text-center text-sm text-gray-500 lg:mr-15">
                   <span>Welcome! Please enter your code and password </span>
-                  <span>to access your account.</span>
+                  <span> to access your account.</span>
                 </p>
 
                 <form className="mt-6 w-full max-w-sm">
@@ -266,7 +271,7 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
-          <div className="absolute bottom-3 left-1/2 ml-8 flex -translate-x-1/2 transform items-center space-x-2 text-gray-500 lg:left-8">
+          <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 transform items-center space-x-2 text-gray-400 lg:left-8">
             <AppVersion />
           </div>
         </div>
@@ -343,8 +348,8 @@ export default function LoginPage() {
             LOG IN ACCOUNT
           </h2>
           <p className="mb-5 max-w-80 justify-center text-center text-xs text-gray-500 md:max-w-full lg:mr-15">
-            <span>Welcome! Please enter your code and password</span>
-            <span>to access your account.</span>
+            <span>Welcome! Please enter your code and password </span>
+            <span> to access your account.</span>
           </p>
           <form
             className="mt-2 flex w-full flex-col gap-4 sm:max-w-md md:max-w-xl"

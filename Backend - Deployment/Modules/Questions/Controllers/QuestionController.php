@@ -36,6 +36,14 @@ class QuestionController extends Controller
             'purpose_id' => 'required|exists:purposes,id'
         ]);
 
+        // Restrict exam questions (purpose_id 3) if subject is disabled
+        if ($validated['purpose_id'] == 3) {
+            $subject = Subject::find($validated['subjectID']);
+            if (!$subject || !$subject->is_enabled_for_exam_questions) {
+                return response()->json(['message' => 'Adding exam questions is currently disabled for this subject.'], 403);
+            }
+        }
+
         return DB::transaction(function () use ($validated, $request) {
             $imagePath = $this->handleImageUpload($request, 'image', 'question_images');
             $question = Question::create([
@@ -71,6 +79,14 @@ class QuestionController extends Controller
             'status_id' => 'sometimes|required|exists:statuses,id',
             'purpose_id' => 'sometimes|required|exists:purposes,id'
         ]);
+
+        // Restrict editing exam questions (purpose_id 3) if subject is disabled
+        if ($question->purpose_id == 3) {
+            $subject = Subject::find($question->subjectID);
+            if (!$subject || !$subject->is_enabled_for_exam_questions) {
+                return response()->json(['message' => 'Editing exam questions is currently disabled for this subject.'], 403);
+            }
+        }
 
         if (isset($validated['questionText'])) {
             $question->questionText = Crypt::encryptString($validated['questionText']);
@@ -169,10 +185,15 @@ class QuestionController extends Controller
             ->where('subjectID', $subjectID)
             ->whereHas('choices');
 
-        // Apply program-based filtering for Program Chairs
+        // Apply program-based filtering for Program Chairs, but also include questions added by the Dean (roleID 4)
         if ($isProgramChair) {
-            $query->whereHas('user', function($q) use ($user) {
-                $q->where('programID', $user->programID);
+            $query->where(function($q) use ($user) {
+                $q->whereHas('user', function($q2) use ($user) {
+                    $q2->where('programID', $user->programID);
+                })
+                ->orWhereHas('user', function($q2) {
+                    $q2->where('roleID', 4); // Dean
+                });
             });
         }
 
@@ -204,6 +225,14 @@ class QuestionController extends Controller
         $question = Question::find($questionID);
         if (!$question) {
             return response()->json(['message' => 'Question not found.'], 404);
+        }
+
+        // Restrict deleting exam questions (purpose_id 3) if subject is disabled
+        if ($question->purpose_id == 3) {
+            $subject = Subject::find($question->subjectID);
+            if (!$subject || !$subject->is_enabled_for_exam_questions) {
+                return response()->json(['message' => 'Deleting exam questions is currently disabled for this subject.'], 403);
+            }
         }
 
         if ($question->image) {
@@ -654,6 +683,56 @@ class QuestionController extends Controller
         ];
     }
 
+    // Return all questions without choices
+    public function questionCount()
+    {
+        $questions = Question::with([
+            'subject',
+            'user.program', // eager load user's program
+            'user.role',    // eager load user's role
+            'status',
+            'difficulty',
+            'coverage',
+            'purpose',
+            'editor' => function($query) {
+                $query->select('userID', 'firstName', 'lastName');
+            },
+            'approver' => function($query) {
+                $query->select('userID', 'firstName', 'lastName');
+            }
+        ])->get();
+
+        // Format questions but skip choices
+        $formatted = $questions->map(function($q) {
+            try {
+                $q->questionText = \Crypt::decryptString($q->questionText);
+            } catch (\Exception $e) {
+                $q->questionText = '[Decryption Error]';
+            }
+            $q->image = $this->generateUrl($q->image);
+            $q->creatorName = optional($q->user)->firstName . ' ' . optional($q->user)->lastName;
+            $q->editorName = optional($q->editor)->firstName . ' ' . optional($q->editor)->lastName;
+            $q->approverName = optional($q->approver)->firstName . ' ' . optional($q->approver)->lastName;
+            $q->status_name = optional($q->status)->name;
+            $q->difficulty_name = optional($q->difficulty)->name;
+            $q->coverage_name = optional($q->coverage)->name;
+            $q->purpose_name = optional($q->purpose)->name;
+            // Add program name
+            $q->program = optional(optional($q->user)->program)->programName;
+            // Add role name, but if Instructor, return Faculty
+            $roleName = optional(optional($q->user)->role)->roleName;
+            $q->role = ($roleName === 'Instructor') ? 'Faculty' : $roleName;
+            unset($q->choices); // Remove choices if present
+            return $q;
+        });
+
+        return response()->json([
+            'message' => 'All questions retrieved successfully (no choices).',
+            'total_questions' => $formatted->count(),
+            'data' => $formatted
+        ]);
+    }
+    
     // ============ PRIVATE HELPERS ============
 
     // Ensure only users with certain roles can access specific methods

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import univLogo from "../assets/univLogo.png";
-import AppVersion from "../components/AppVersion";
+import AppVersion from "../components/appVersion";
 import collegeLogo from "/src/assets/college-logo.png";
 import Toast from "./Toast";
+import useToast from "../hooks/useToast";
 
 // Reset Password Form
 const ResetPasswordPage = () => {

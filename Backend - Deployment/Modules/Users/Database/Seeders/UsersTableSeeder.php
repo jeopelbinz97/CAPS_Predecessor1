@@ -13,11 +13,17 @@ class UsersTableSeeder extends Seeder
     {
         try {
             // Get status ID for registered users
-            $registeredStatusId = DB::table('statuses')
+            $status = DB::table('statuses')
                 ->where('name', 'registered')
-                ->first()
-                ->id;
+                ->first();
 
+            if (!$status) {
+                throw new \Exception('Status "registered" not found in statuses table');
+            }
+
+            $registeredStatusId = $status->id;
+
+            // Insert initial users
             $users = [
                 // Original users
                 [
@@ -42,7 +48,7 @@ class UsersTableSeeder extends Seeder
                     'roleID' => 4,
                     'campusID' => 1,
                     'isActive' => true,
-                    'status_id' => $registeredStatusId,
+                    'status_id' => 4,
                     'programID' => 4
                 ],
                 // Program Chairs
@@ -106,7 +112,6 @@ class UsersTableSeeder extends Seeder
                     'status_id' => $registeredStatusId,
                     'programID' => 5
                 ],
-
                 // Faculty
                 [
                     'userCode' => '23-A-12347',
@@ -170,7 +175,7 @@ class UsersTableSeeder extends Seeder
                 ],
             ];
 
-            // Insert the predefined users first
+            // Insert initial users
             DB::table('users')->insert($users);
 
             // Add 5000 more users
@@ -185,10 +190,10 @@ class UsersTableSeeder extends Seeder
             $totalUsers = 5000;
             $bulkUsers = [];
 
-            for ($i = 5001; $i <= 10000; $i++) {
+            for ($i = 1; $i <= $totalUsers; $i++) {
                 $year = 23;
                 $campus = 'A';
-                $number = str_pad($i, 5, '0', STR_PAD_LEFT);
+                $number = str_pad($i + 10000, 5, '0', STR_PAD_LEFT);
                 $userCode = "{$year}-{$campus}-{$number}";
                 
                 $firstName = $firstNames[array_rand($firstNames)];
@@ -236,7 +241,7 @@ class UsersTableSeeder extends Seeder
                 }
             }
 
-            $this->command->info("Successfully seeded 5000 users!");
+            $this->command->info("Successfully seeded " . (count($users) + $totalUsers) . " users!");
         } catch (\Exception $e) {
             $this->command->error('Failed to seed users: ' . $e->getMessage());
             throw $e;
